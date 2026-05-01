@@ -18,10 +18,10 @@ const createToken = (user) => {
 const authController = {
     register: async (req, res) => {
         try {
-            const { userName, pass, Email, roles } = req.body;
+            const { userName, fullName, pass, Email, roles } = req.body;
 
-            if (!userName || !pass) {
-                return res.status(400).json({ success: false, message: 'userName và pass là bắt buộc.' });
+            if (!fullName || !userName || !pass) {
+                return res.status(400).json({ success: false, message: 'fullName, userName và pass là bắt buộc.' });
             }
 
             const existingUser = await userModel.findByUserName(userName);
@@ -45,6 +45,18 @@ const authController = {
                 tinhTrang: 'Hoat dong',
                 roles: roles || 'customer'
             });
+
+            try {
+                await userModel.createCustomer({
+                    idKH: `kh-${crypto.randomUUID()}`,
+                    idUsers: newUser.idusers,
+                    tenKH: fullName
+                });
+            } catch (customerError) {
+                await userModel.deleteUserById(newUser.idusers);
+                console.error('Lỗi tạo Khách Hàng:', customerError);
+                return res.status(500).json({ success: false, message: 'Lỗi server khi lưu thông tin khách hàng.' });
+            }
 
             const token = createToken(newUser);
 

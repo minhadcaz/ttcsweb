@@ -30,6 +30,17 @@ const userModel = {
         return rows[0];
     },
 
+    createCustomer: async (customerData) => {
+        const { idKH, idUsers, tenKH } = customerData;
+        const sql = `
+            INSERT INTO khachhang (idkh, idusers, tenkh)
+            VALUES ($1, $2, $3)
+            RETURNING idkh, idusers, tenkh;
+        `;
+        const { rows } = await db.query(sql, [idKH, idUsers, tenKH]);
+        return rows[0];
+    },
+
     getById: async (id) => {
         const sql = 'SELECT idusers, username, email, tinhtrang, roles, ngaytao, hoatdonggannhat FROM users WHERE idusers = $1 LIMIT 1';
         const { rows } = await db.query(sql, [id]);
@@ -38,6 +49,11 @@ const userModel = {
 
     updateLastActive: async (id) => {
         const sql = 'UPDATE users SET hoatdonggannhat = NOW() WHERE idusers = $1';
+        await db.query(sql, [id]);
+    },
+
+    deleteUserById: async (id) => {
+        const sql = 'DELETE FROM users WHERE idusers = $1';
         await db.query(sql, [id]);
     }
 };

@@ -4,6 +4,11 @@ require('dotenv').config();
 
 const authRoute = require('./src/routes/authRoute');
 const productRoute = require('./src/routes/productRoute');
+const orderRoute = require('./src/routes/orderRoute');
+const promotionRoute = require('./src/routes/promotionRoute');
+const warrantyRoute = require('./src/routes/warrantyRoute');
+const userRoleRoute = require('./src/routes/userRoleRoute');
+const inventoryRoute = require('./src/routes/inventoryRoute');
 
 const app = express();
 
@@ -19,6 +24,11 @@ app.get('/', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoute);
 app.use('/api/products', productRoute);
+app.use('/api/orders', orderRoute);
+app.use('/api/promotions', promotionRoute);
+app.use('/api/warranties', warrantyRoute);
+app.use('/api/admin', userRoleRoute);
+app.use('/api/inventory', inventoryRoute);
 
 // Khởi động Server
 const PORT = process.env.PORT || 5000;
