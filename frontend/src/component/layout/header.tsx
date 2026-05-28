@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, RefObject } from 'react';
-import logo1 from '../../assets/logo1.png';
+import React, { useState, useEffect, useRef } from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 
@@ -7,65 +6,48 @@ import {
   MapPin, 
   Truck, 
   Home,
-  Tag, 
-  Menu, 
   Search, 
   List, 
   User, 
   ShoppingCart, 
   ChevronDown,
+  Menu,
+  X,
+  Laptop,
+  Monitor,
+  Cpu,
+  HardDrive,
+  Speaker,
+  Keyboard,
+  Mouse,
+  Headphones,
+  Gamepad2,
+  Printer,
+  Package,
+  Gift,
   LogOut,
   FileText,
-  UserCircle
+  UserCircle,
+  ShieldCheck
 } from 'lucide-react';
 
 interface HeaderProps {
   onLoginClick: () => void;
 }
 
-// MỚI THÊM: Cập nhật dữ liệu để mỗi danh mục có thêm mảng menu con (subCategories)
-const pcCategories = [
-  {
-    name: "CPU - Bộ vi xử lý",
-    subCategories: ["Intel Core i3", "Intel Core i5", "Intel Core i7", "Intel Core i9", "AMD Ryzen 5", "AMD Ryzen 7", "AMD Ryzen 9"]
-  },
-  {
-    name: "Mainboard - Bo mạch chủ",
-    subCategories: ["Mainboard Intel (H610, B760, Z790)", "Mainboard AMD (A620, B650, X670)"]
-  },
-  {
-    name: "VGA - Card màn hình",
-    subCategories: ["NVIDIA GeForce RTX 40 Series", "NVIDIA GeForce RTX 30 Series", "AMD Radeon RX 7000 Series"]
-  },
-  { 
-    name: "RAM - Bộ nhớ trong", 
-    subCategories: ["RAM DDR4", "RAM DDR5", "RAM Laptop"] 
-  },
-  { 
-    name: "Ổ cứng SSD / HDD", 
-    subCategories: ["SSD NVMe (M.2)", "SSD SATA", "HDD Desktop", "HDD Laptop"] 
-  },
-  { 
-    name: "Nguồn máy tính (PSU)", 
-    subCategories: ["Dưới 500W", "500W - 650W", "700W - 850W", "Trên 1000W"] 
-  },
-  { 
-    name: "Case - Vỏ máy tính", 
-    subCategories: ["Case Mid Tower", "Case Full Tower", "Case Mini ITX"] 
-  },
-  { 
-    name: "Tản nhiệt PC", 
-    subCategories: ["Tản nhiệt khí", "Tản nhiệt nước AIO", "Tản nhiệt nước Custom", "Quạt tản nhiệt (Fan)"] 
-  },
-  {name: "Build PC"}
-];
-
 const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const logo1 = new URL('../../assets/logo1.png', import.meta.url).href;
   const [user, setUser] = useState<any>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const navMenuRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Lấy thông tin user từ localStorage
@@ -93,11 +75,19 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
       }
+
+      if (navMenuRef.current && !navMenuRef.current.contains(event.target as Node)) {
+        setIsNavMenuOpen(false);
+      }
+
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
@@ -110,36 +100,55 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
     navigate('/');
   };
 
-  const categories = [
-   { name: '🔥 Khuyến Mãi Hot', active: true, link: '#' },
-    { name: 'Lắp Ráp PC (Build PC)', active: false, isBuildPC: true, link: '/build-pc' }, // Đường dẫn chuẩn bị sẵn cho trang Build PC
-    { name: 'PC Gaming', active: false, link: '#' },
-    { name: 'PC Văn Phòng', active: false, link: '#' },
-    { name: 'Linh Kiện Cũ Giá Rẻ', active: false, link: '#' },
-    { name: 'Bàn Phím & Chuột', active: false, link: '#' },
-    { name: 'Màn Hình', active: false, link: '#' },
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
     
+    if (value.trim().length > 0) {
+      setShowSuggestions(true);
+      // Generate suggestions based on common products
+      const suggestions = [
+        'CPU Intel',
+        'CPU AMD Ryzen',
+        'Mainboard ASUS',
+        'RAM DDR5',
+        'SSD NVMe',
+        'VGA RTX 4070',
+        'PSU 750W',
+        'Monitor 27 inch'
+      ].filter(s => s.toLowerCase().includes(value.toLowerCase()));
+      setSearchSuggestions(suggestions);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSearch = (query: string = searchQuery) => {
+    if (query.trim()) {
+      setShowSuggestions(false);
+      navigate(`/collections?search=${encodeURIComponent(query.trim())}`);
+      setSearchQuery('');
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  const navigationItems = [
+    { name: 'CPU - Vi xử lý', slug: 'cpu', icon: Cpu },
+    { name: 'Mainboard', slug: 'mainboard', icon: Monitor },
+    { name: 'RAM', slug: 'ram', icon: HardDrive },
+    { name: 'SSD', slug: 'ssd', icon: HardDrive },
+    { name: 'HDD', slug: 'hdd', icon: HardDrive },
+    { name: 'Nguồn (PSU)', slug: 'nguon', icon: Package },
+    { name: 'VGA - Card màn hình', slug: 'vga', icon: Cpu },
+    { name: 'Case - Vỏ máy', slug: 'case', icon: Package },
+    { name: 'Màn hình (Monitor)', slug: 'monitor', icon: Monitor },
+    { name: 'Chuột (Mouse)', slug: 'mouse', icon: Mouse }
   ];
-
-  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false); // state theo dõi trạng thái đóng mở của bảng danh mục cấp 1
-  
-  //  State theo dõi người dùng đang hover vào danh mục số mấy
-  const [activeHoverCategory, setActiveHoverCategory] = useState<number | null>(null); 
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsCategoryMenuOpen(false); 
-        setActiveHoverCategory(null); 
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []); 
 
   return (
     
@@ -179,88 +188,95 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
       {/* Main Header */}
       <div className="py-4 px-4 md:px-8 flex items-center justify-between gap-4 md:gap-8">
         
-        {/* Logo Area & Nút Menu */}
-        <div className="flex items-center gap-3">
-
-          <div className="relative" ref={menuRef}>
-
-            <button 
-              onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
-              className="p-2 bg-[#f0f8ff] rounded-xl text-blue-500 hover:bg-blue-100 transition-colors"
+        {/* Logo Area */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="relative" ref={navMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsNavMenuOpen(!isNavMenuOpen)}
+              className="flex h-10 w-10 items-center justify-center rounded-[22px] border border-[#eef4f8] bg-[#f5fafc] text-[#2ea3d4] shadow-[0_1px_6px_rgba(15,23,42,0.06)] transition-colors hover:bg-[#eef7fb] hover:text-[#1f8dbd]"
+              aria-label="Mở danh mục sản phẩm"
+              aria-expanded={isNavMenuOpen}
             >
-              <Menu size={24} />
+              <Menu size={28} strokeWidth={2.2} />
             </button>
 
-            {/* Bảng danh mục Dropdown Cấp 1 */}
-            {isCategoryMenuOpen && (
+            {isNavMenuOpen && (
+              <div className="absolute left-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
+                <div className="border-b border-gray-100 bg-white px-4 py-3">
+                  <p className="text-sm font-semibold tracking-wide text-gray-900">DANH MỤC SẢN PHẨM</p>
+                </div>
 
-              <div className="absolute top-full left-0 mt-3 w-72 bg-white border border-gray-100 shadow-xl rounded-xl z-50 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="max-h-[70vh] overflow-y-auto py-1">
+                  {navigationItems.map((item) => {
+                    const Icon = item.icon;
 
-               
-
-                <ul className="flex flex-col relative" onMouseLeave={() => setActiveHoverCategory(null)}> {/*thêm onmouseLeave để trượt ra khỏi bảng menu con tự tắt*/}
-                  {pcCategories.map((category, index) => (
-                    <li 
-                      key={index}
-                      // MỚI THÊM: Khi chuột trỏ vào thẻ li nào, gán state bằng index của thẻ đó
-                      onMouseEnter={() => setActiveHoverCategory(index)}
-                      className="relative group"
-                    >
-                      <a 
-                        href="#" 
-                        className="flex justify-between items-center px-5 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-[#0088cc] font-medium transition-colors"
+                    return (
+                      <button
+                        key={item.name}
+                        type="button"
+                        onClick={() => {
+                          setIsNavMenuOpen(false);
+                          // Nếu có slug, điều hướng tới collections với query
+                          if (item.slug) navigate(`/collections?category=${encodeURIComponent(item.slug)}`);
+                        }}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] text-gray-800 transition-colors hover:bg-[#f4f7fb] hover:text-[#d71820]"
                       >
-                        {category.name}
-                        {/* Biểu tượng mũi tên nhỏ báo hiệu có menu cấp 2 */}
-                        {category.subCategories && (
-                          <ChevronDown size={16} className="-rotate-90 text-gray-400 group-hover:text-blue-500" />
-                        )}
-                      </a>
-
-                      {/* MỚI THÊM: Bảng danh mục Sub-menu Cấp 2 */}
-                      {/* Chỉ hiển thị khi đang hover đúng vào index này VÀ danh mục đó có subCategories */}
-                      {activeHoverCategory === index && category.subCategories && (
-                        <div className="absolute top-0 left-full ml-1 w-64 bg-white border border-gray-100 shadow-xl rounded-xl z-50 py-2 min-h-full">
-                          <ul className="flex flex-col">
-                            {category.subCategories.map((subItem, subIndex) => (
-                              <li key={subIndex}>
-                                <a 
-                                  href="#" 
-                                  onClick={() => {
-                                    setIsCategoryMenuOpen(false); // Đóng bảng lớn
-                                    setActiveHoverCategory(null); // Đóng bảng nhỏ
-                                  }}
-                                  className="block px-5 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-[#0088cc] transition-colors"
-                                >
-                                  {subItem}
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                        <Icon size={18} className="shrink-0 text-gray-500" strokeWidth={1.8} />
+                        <span className="flex-1 leading-none">{item.name}</span>
+                        <ChevronDown size={16} className="shrink-0 rotate-[-90deg] text-gray-400" />
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
-          
-          <div className="flex items-center gap-2 cursor-pointer">
+
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
             <img src={logo1} alt="TrùmLinhKiện" className="h-12 w-auto" />
             <span className="text-2xl font-bold text-[#0088cc]">TrùmLinhKiện</span>
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="hidden md:flex flex-1 max-w-2xl bg-[#f3f5f7] rounded-lg items-center px-4 py-2.5">
-          <Search size={20} className="text-blue-500 mr-2" />
-          <input 
-            type="text" 
-            placeholder="Tìm kiếm sản phẩm, thương hiệu, và hơn thế nữa ..." 
-            className="flex-1 bg-transparent border-none outline-none text-gray-700 placeholder-gray-400"
-          />
-          <List size={20} className="text-blue-500 cursor-pointer" />
+        <div className="hidden md:flex flex-1 max-w-2xl relative" ref={searchRef}>
+          <div className="flex-1 bg-[#f3f5f7] rounded-lg flex items-center px-4 py-2.5">
+            <Search size={20} className="text-blue-500 mr-2" />
+            <input 
+              type="text" 
+              placeholder="Tìm kiếm sản phẩm, thương hiệu, và hơn thế nữa ..." 
+              className="flex-1 bg-transparent border-none outline-none text-gray-700 placeholder-gray-400"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onKeyPress={handleKeyPress}
+              onFocus={() => searchQuery.trim() && setShowSuggestions(true)}
+            />
+            <List 
+              size={20} 
+              className="text-blue-500 cursor-pointer hover:text-blue-600 transition-colors"
+              onClick={() => handleSearch()}
+            />
+          </div>
+          
+          {/* Search Suggestions */}
+          {showSuggestions && searchSuggestions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+              {searchSuggestions.map((suggestion, idx) => (
+                <button
+                  key={idx}
+                  className="w-full text-left px-4 py-2.5 hover:bg-blue-50 text-sm text-gray-700 flex items-center gap-2"
+                  onClick={() => {
+                    setSearchQuery(suggestion);
+                    handleSearch(suggestion);
+                  }}
+                >
+                  <Search size={16} className="text-gray-400" />
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* User Actions */}
@@ -297,14 +313,16 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
                     <span>Thông tin cá nhân</span>
                   </Link>
 
-                  <Link
-                    to="/orders"
-                    onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                  >
-                    <FileText size={18} />
-                    <span>Tra cứu đơn hàng</span>
-                  </Link>
+                  {user?.roles && (user.roles === 'admin' || user.roles === 'ADMIN') && (
+                    <Link
+                      to="/admin"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                    >
+                      <ShieldCheck size={18} />
+                      <span>Trang Admin</span>
+                    </Link>
+                  )}
 
                   <div className="border-t border-gray-100 mt-1"></div>
 
@@ -326,31 +344,13 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
           )}
 
           <div className="w-px h-6 bg-gray-300 hidden sm:block"></div>
-          <Link to="/cart" className="flex items-center gap-2 hover:text-blue-600 cursor-pointer transition-colors">
+          <Link to="/collections" className="flex items-center gap-2 hover:text-blue-600 cursor-pointer transition-colors">
             <ShoppingCart size={20} className="text-blue-500" />
-            <span className="hidden sm:inline">Giỏ Hàng</span>
+            <span className="hidden sm:inline">Sản phẩm</span>
           </Link>
         </div>
       </div>
 
-      {/* Category Navigation */}
-      <div className="border-t border-gray-100 px-4 md:px-8 py-3">
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1">
-          {categories.map((category, index) => (
-            <button
-              key={index}
-              className={`flex items-center whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                category.active 
-                  ? 'bg-[#0088cc] text-white shadow-sm' 
-                  : 'bg-[#f3f5f7] text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {category.name}
-              <ChevronDown size={16} className={`ml-1 ${category.active ? 'text-white' : 'text-blue-500'}`} />
-            </button>
-          ))}
-        </div>
-      </div>
     </header>
     
   );

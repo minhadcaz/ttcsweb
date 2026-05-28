@@ -4,8 +4,8 @@ const userRoleController = require('../controllers/userRoleController');
 
 // Routes cho người dùng
 router.get('/users', userRoleController.getAllUsers);
-router.get('/users/:id', userRoleController.getUserById);
 router.get('/users/role/:roleId', userRoleController.getUsersByRole);
+router.get('/users/:id', userRoleController.getUserById);
 router.post('/users', userRoleController.createUser);
 router.put('/users/:id', userRoleController.updateUser);
 router.put('/users/:id/password', userRoleController.updatePassword);

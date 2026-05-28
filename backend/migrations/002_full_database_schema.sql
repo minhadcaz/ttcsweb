@@ -85,7 +85,7 @@ CREATE TABLE KhachHang (
     IdKH VARCHAR(50) PRIMARY KEY,
     idUsers VARCHAR(50) UNIQUE REFERENCES Users(idUsers),
     TenKH VARCHAR(100) NOT NULL,
-    DiaChi TEXT,
+    DiaChi jsonb,
     SDT VARCHAR(20) UNIQUE NOT NULL
 );
 

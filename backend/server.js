@@ -4,7 +4,8 @@ require('dotenv').config();
 
 const authRoute = require('./src/routes/authRoute');
 const productRoute = require('./src/routes/productRoute');
-const orderRoute = require('./src/routes/orderRoute');
+const categoryRoute = require('./src/routes/categoryRoute');
+const manufacturerRoute = require('./src/routes/manufacturerRoute');
 const promotionRoute = require('./src/routes/promotionRoute');
 const warrantyRoute = require('./src/routes/warrantyRoute');
 const userRoleRoute = require('./src/routes/userRoleRoute');
@@ -24,7 +25,8 @@ app.get('/', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoute);
 app.use('/api/products', productRoute);
-app.use('/api/orders', orderRoute);
+app.use('/api/categories', categoryRoute);
+app.use('/api/manufacturers', manufacturerRoute);
 app.use('/api/promotions', promotionRoute);
 app.use('/api/warranties', warrantyRoute);
 app.use('/api/admin', userRoleRoute);

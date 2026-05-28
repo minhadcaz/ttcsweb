@@ -10,7 +10,8 @@ const RegisterPage = () => {
 
   // State quản lý form data
   const [formData, setFormData] = useState({
-    name: '',
+    fullName: '',
+    userName: '',
     email: '',
     password: '',
     confirmPassword: ''
@@ -30,9 +31,14 @@ const RegisterPage = () => {
   const validateForm = () => {
     const newErrors = {};
 
-    // Validate tên
-    if (!formData.name.trim()) {
-      newErrors.name = 'Vui lòng nhập họ tên';
+    // Validate họ và tên
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = 'Vui lòng nhập họ và tên';
+    }
+
+    // Validate tên đăng nhập
+    if (!formData.userName.trim()) {
+      newErrors.userName = 'Vui lòng nhập tên đăng nhập';
     }
 
     // Validate email
@@ -89,7 +95,8 @@ const RegisterPage = () => {
 
     try {
       const payload = {
-        userName: formData.name.trim(),
+        userName: formData.userName.trim(),
+        fullName: formData.fullName.trim(),
         pass: formData.password,
         Email: formData.email.trim(),
         roles: 'customer'
@@ -111,24 +118,19 @@ const RegisterPage = () => {
         return;
       }
 
-      setServerMessage('Đăng ký thành công! Đang chuyển đến trang chủ...');
+      setServerMessage('Đăng ký thành công! Đang chuyển đến trang đăng nhập...');
       addToast('Đăng ký thành công! 🎉', 'success', 2000);
       
       setFormData({
-        name: '',
+        fullName: '',
+        userName: '',
         email: '',
         password: '',
         confirmPassword: ''
       });
       
-      // Lưu token và user info nếu backend trả về
-      if (result.data?.token) {
-        localStorage.setItem('authToken', result.data.token);
-        localStorage.setItem('authUser', JSON.stringify(result.data.user));
-      }
-      
       setTimeout(() => {
-        navigate('/');
+        navigate('/login');
       }, 800);
     } catch (error) {
       console.error('Lỗi đăng ký:', error);
@@ -163,16 +165,36 @@ const RegisterPage = () => {
               </div>
               <input 
                 type="text" 
-                name="name"
-                value={formData.name}
+                name="fullName"
+                value={formData.fullName}
                 onChange={handleInputChange}
                 className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all ${
-                  errors.name ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-blue-500'
+                  errors.fullName ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-blue-500'
                 }`}
-                placeholder="Nhập họ tên của bạn..."
+                placeholder="Nhập họ và tên của bạn..."
               />
             </div>
-            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+            {errors.fullName && <p className="text-red-500 text-xs mt-1">{errors.fullName}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Tên đăng nhập</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <User size={18} className="text-gray-400" />
+              </div>
+              <input 
+                type="text" 
+                name="userName"
+                value={formData.userName}
+                onChange={handleInputChange}
+                className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all ${
+                  errors.userName ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-blue-500'
+                }`}
+                placeholder="Nhập tên đăng nhập..."
+              />
+            </div>
+            {errors.userName && <p className="text-red-500 text-xs mt-1">{errors.userName}</p>}
           </div>
 
           <div>

@@ -161,14 +161,6 @@ const ProfilePage = () => {
               </button>
 
               <button
-                onClick={() => navigate('/orders')}
-                className="w-full text-left px-4 py-3 flex items-center gap-3 text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <Package size={20} />
-                <span className="font-medium">Quản lý đơn hàng</span>
-              </button>
-
-              <button
                 onClick={() => setActiveTab('logout')}
                 className="w-full text-left px-4 py-3 flex items-center gap-3 text-red-600 hover:bg-red-50 transition-colors border-t"
               >

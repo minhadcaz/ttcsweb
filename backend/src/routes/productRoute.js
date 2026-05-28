@@ -11,6 +11,7 @@ router.get('/:id', productController.getById);
 
 // CREATE (Thêm mới)
 router.post('/', productController.create);
+router.post('/import-bulk', productController.importBulk);
 
 // UPDATE (Cập nhật)
 router.put('/:id', productController.update);

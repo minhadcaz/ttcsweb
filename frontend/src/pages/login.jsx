@@ -45,8 +45,14 @@ const LoginPage = () => {
         localStorage.setItem('authToken', result.data.token);
         localStorage.setItem('authUser', JSON.stringify(result.data.user));
         addToast('Đăng nhập thành công! 🎉', 'success', 2000);
+
+        const userRole = result.data.user?.roles;
         setTimeout(() => {
-          navigate('/');
+          if (userRole === 'admin' || userRole === 'ADMIN') {
+            navigate('/admin');
+          } else {
+            navigate('/');
+          }
         }, 500);
       } else {
         setErrorMessage(result.message || 'Đăng nhập thất bại.');

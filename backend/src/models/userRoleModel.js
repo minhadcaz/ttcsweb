@@ -1,190 +1,194 @@
 const db = require('../config/db');
 
+const ALLOWED_ROLES = ['customer', 'employee', 'admin'];
+
 const userRoleModel = {
-    // Lấy tất cả người dùng với vai trò
+    // Lấy tất cả users từ bảng Users
     getAllUsers: async () => {
         const sql = `
-            SELECT nv.*, vt.tenVT as role_name, vt.moTa as role_description
-            FROM NhanVien nv
-            LEFT JOIN VaiTro vt ON nv.idVT = vt.idVT
-            ORDER BY nv.tenNV
+            SELECT
+                idusers,
+                username,
+                email,
+                tinhtrang,
+                roles,
+                ngaytao,
+                hoatdonggannhat
+            FROM Users
+            ORDER BY ngaytao DESC
         `;
         const { rows } = await db.query(sql);
         return rows;
     },
 
-    // Lấy người dùng theo ID
+    // Lấy user theo ID
     getUserById: async (id) => {
         const sql = `
-            SELECT nv.*, vt.tenVT as role_name, vt.moTa as role_description
-            FROM NhanVien nv
-            LEFT JOIN VaiTro vt ON nv.idVT = vt.idVT
-            WHERE nv.idNV = $1
+            SELECT
+                idusers,
+                username,
+                email,
+                tinhtrang,
+                roles,
+                ngaytao,
+                hoatdonggannhat
+            FROM Users
+            WHERE idusers = $1
+            LIMIT 1
         `;
         const { rows } = await db.query(sql, [id]);
         return rows[0];
     },
 
-    // Tạo người dùng mới (nhân viên)
+    // Tạo user mới
     createUser: async (userData) => {
         const {
-            idNV, idVT, tenNV, email, matKhau, sdt,
-            diaChi, ngaySinh, ngayVaoLam, luong, trangThai
+            idusers,
+            username,
+            pass,
+            email,
+            tinhtrang = 'Hoat dong',
+            roles = 'customer'
         } = userData;
 
         const sql = `
-            INSERT INTO NhanVien (
-                idNV, idVT, tenNV, email, matKhau, sdt,
-                diaChi, ngaySinh, ngayVaoLam, luong, trangThai
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-            RETURNING *
+            INSERT INTO Users (idusers, username, pass, email, tinhtrang, roles, ngaytao, hoatdonggannhat)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+            RETURNING idusers, username, email, tinhtrang, roles, ngaytao, hoatdonggannhat
         `;
-        const { rows } = await db.query(sql, [
-            idNV, idVT, tenNV, email, matKhau, sdt,
-            diaChi, ngaySinh, ngayVaoLam, luong, trangThai
-        ]);
+        const { rows } = await db.query(sql, [idusers, username, pass, email || null, tinhtrang, roles]);
         return rows[0];
     },
 
-    // Cập nhật người dùng
+    // Cập nhật user (ưu tiên role + status cho admin)
     updateUser: async (id, userData) => {
-        const {
-            idVT, tenNV, email, sdt, diaChi, ngaySinh,
-            ngayVaoLam, luong, trangThai
-        } = userData;
+        const existing = await userRoleModel.getUserById(id);
+        if (!existing) return null;
+
+        const roles = userData.roles || existing.roles;
+        const tinhtrang = userData.tinhtrang || existing.tinhtrang;
+        const email = userData.email === undefined ? existing.email : userData.email;
 
         const sql = `
-            UPDATE NhanVien SET
-                idVT = $1, tenNV = $2, email = $3, sdt = $4, diaChi = $5,
-                ngaySinh = $6, ngayVaoLam = $7, luong = $8, trangThai = $9
-            WHERE idNV = $10
-            RETURNING *
+            UPDATE Users
+            SET roles = $1,
+                tinhtrang = $2,
+                email = $3,
+                hoatdonggannhat = NOW()
+            WHERE idusers = $4
+            RETURNING idusers, username, email, tinhtrang, roles, ngaytao, hoatdonggannhat
         `;
-        const { rows } = await db.query(sql, [
-            idVT, tenNV, email, sdt, diaChi, ngaySinh,
-            ngayVaoLam, luong, trangThai, id
-        ]);
+        const { rows } = await db.query(sql, [roles, tinhtrang, email, id]);
         return rows[0];
     },
 
-    // Cập nhật mật khẩu
-    updatePassword: async (id, newPassword) => {
-        const sql = 'UPDATE NhanVien SET matKhau = $1 WHERE idNV = $2 RETURNING *';
-        const { rows } = await db.query(sql, [newPassword, id]);
+    // Cập nhật mật khẩu (đã hash từ controller)
+    updatePassword: async (id, newPasswordHash) => {
+        const sql = `
+            UPDATE Users
+            SET pass = $1,
+                hoatdonggannhat = NOW()
+            WHERE idusers = $2
+            RETURNING idusers, username, email, tinhtrang, roles, ngaytao, hoatdonggannhat
+        `;
+        const { rows } = await db.query(sql, [newPasswordHash, id]);
         return rows[0];
     },
 
-    // Xóa người dùng
+    // Xóa user (giữ API cũ, chưa dùng ở UI mới)
     deleteUser: async (id) => {
-        const sql = 'DELETE FROM NhanVien WHERE idNV = $1 RETURNING *';
+        const sql = 'DELETE FROM Users WHERE idusers = $1 RETURNING idusers';
         const { rows } = await db.query(sql, [id]);
         return rows.length > 0;
     },
 
-    // Lấy người dùng theo vai trò
+    // Lấy users theo role
     getUsersByRole: async (roleId) => {
         const sql = `
-            SELECT nv.*, vt.tenVT as role_name
-            FROM NhanVien nv
-            LEFT JOIN VaiTro vt ON nv.idVT = vt.idVT
-            WHERE nv.idVT = $1
-            ORDER BY nv.tenNV
+            SELECT
+                idusers,
+                username,
+                email,
+                tinhtrang,
+                roles,
+                ngaytao,
+                hoatdonggannhat
+            FROM Users
+            WHERE roles = $1
+            ORDER BY ngaytao DESC
         `;
         const { rows } = await db.query(sql, [roleId]);
         return rows;
     },
 
-    // Lấy tất cả vai trò
+    // Danh sách roles cho dropdown admin
     getAllRoles: async () => {
-        const sql = 'SELECT * FROM VaiTro ORDER BY tenVT';
-        const { rows } = await db.query(sql);
-        return rows;
+        return ALLOWED_ROLES.map((role) => ({
+            idvt: role,
+            tenvt: role,
+            mota: `Vai trò ${role}`
+        }));
     },
 
-    // Lấy vai trò theo ID
     getRoleById: async (id) => {
-        const sql = 'SELECT * FROM VaiTro WHERE idVT = $1';
-        const { rows } = await db.query(sql, [id]);
-        return rows[0];
+        if (!ALLOWED_ROLES.includes(id)) return null;
+        return {
+            idvt: id,
+            tenvt: id,
+            mota: `Vai trò ${id}`
+        };
     },
 
-    // Tạo vai trò mới
-    createRole: async (roleData) => {
-        const { idVT, tenVT, moTa, quyenHan } = roleData;
-
-        const sql = `
-            INSERT INTO VaiTro (idVT, tenVT, moTa, quyenHan)
-            VALUES ($1, $2, $3, $4)
-            RETURNING *
-        `;
-        const { rows } = await db.query(sql, [idVT, tenVT, moTa, quyenHan]);
-        return rows[0];
+    createRole: async () => {
+        throw new Error('Hệ thống này dùng vai trò cố định, không hỗ trợ tạo role mới.');
     },
 
-    // Cập nhật vai trò
-    updateRole: async (id, roleData) => {
-        const { tenVT, moTa, quyenHan } = roleData;
-
-        const sql = `
-            UPDATE VaiTro SET tenVT = $1, moTa = $2, quyenHan = $3
-            WHERE idVT = $4
-            RETURNING *
-        `;
-        const { rows } = await db.query(sql, [tenVT, moTa, quyenHan, id]);
-        return rows[0];
+    updateRole: async () => {
+        throw new Error('Hệ thống này dùng vai trò cố định, không hỗ trợ sửa role.');
     },
 
-    // Xóa vai trò
-    deleteRole: async (id) => {
-        const sql = 'DELETE FROM VaiTro WHERE idVT = $1 RETURNING *';
-        const { rows } = await db.query(sql, [id]);
-        return rows.length > 0;
+    deleteRole: async () => {
+        throw new Error('Hệ thống này dùng vai trò cố định, không hỗ trợ xóa role.');
     },
 
-    // Lấy quyền hạn của vai trò
     getRolePermissions: async (roleId) => {
-        const sql = 'SELECT quyenHan FROM VaiTro WHERE idVT = $1';
-        const { rows } = await db.query(sql, [roleId]);
-        return rows[0]?.quyenHan || {};
+        const role = String(roleId || '').toLowerCase();
+        if (role === 'admin') {
+            return { manageProducts: true, manageOrders: true, manageUsers: true, viewStats: true };
+        }
+        if (role === 'employee') {
+            return { manageProducts: true, manageOrders: true, manageUsers: false, viewStats: true };
+        }
+        return { manageProducts: false, manageOrders: false, manageUsers: false, viewStats: false };
     },
 
-    // Kiểm tra quyền hạn của người dùng
     checkUserPermission: async (userId, permission) => {
-        const sql = `
-            SELECT vt.quyenHan
-            FROM NhanVien nv
-            LEFT JOIN VaiTro vt ON nv.idVT = vt.idVT
-            WHERE nv.idNV = $1
-        `;
-        const { rows } = await db.query(sql, [userId]);
-
-        if (rows.length === 0) return false;
-
-        const permissions = rows[0].quyenHan || {};
-        return permissions[permission] === true;
+        const user = await userRoleModel.getUserById(userId);
+        if (!user) return false;
+        const permissions = await userRoleModel.getRolePermissions(user.roles);
+        return permissions[String(permission || '')] === true;
     },
 
-    // Đăng nhập (tìm người dùng theo email)
+    // Không dùng cho auth chính, vẫn giữ để tương thích route cũ
     findUserByEmail: async (email) => {
         const sql = `
-            SELECT nv.*, vt.tenVT as role_name, vt.quyenHan as permissions
-            FROM NhanVien nv
-            LEFT JOIN VaiTro vt ON nv.idVT = vt.idVT
-            WHERE nv.email = $1
+            SELECT idusers, username, email, pass, tinhtrang, roles, ngaytao, hoatdonggannhat
+            FROM Users
+            WHERE email = $1
+            LIMIT 1
         `;
         const { rows } = await db.query(sql, [email]);
         return rows[0];
     },
 
-    // Thống kê người dùng
     getUserStats: async () => {
         const sql = `
             SELECT
                 COUNT(*) as total_users,
-                COUNT(CASE WHEN trangThai = 'active' THEN 1 END) as active_users,
-                COUNT(CASE WHEN trangThai = 'inactive' THEN 1 END) as inactive_users,
-                COUNT(DISTINCT idVT) as total_roles
-            FROM NhanVien
+                COUNT(CASE WHEN tinhtrang = 'Hoat dong' THEN 1 END) as active_users,
+                COUNT(CASE WHEN tinhtrang = 'Khong hoat dong' THEN 1 END) as inactive_users,
+                COUNT(DISTINCT roles) as total_roles
+            FROM Users
         `;
         const { rows } = await db.query(sql);
         return rows[0];

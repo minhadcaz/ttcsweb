@@ -1,4 +1,28 @@
 const db = require('../config/db');
+const crypto = require('crypto');
+const { resolveQuantityColumn } = require('../utils/columnResolver');
+
+const generateIdTK = () => `TK-${crypto.randomBytes(6).toString('hex')}`;
+
+const normalizeProductId = (productId) => {
+    if (productId === undefined || productId === null) return null;
+    const value = String(productId).trim();
+    return value || null;
+};
+
+const ensureProductExists = async (productId) => {
+    const normalizedId = normalizeProductId(productId);
+    if (!normalizedId) {
+        throw new Error('Thiếu mã sản phẩm để cập nhật tồn kho');
+    }
+
+    const existingProduct = await db.query('SELECT idSP FROM SanPham WHERE idSP = $1', [normalizedId]);
+    if (existingProduct.rows.length === 0) {
+        throw new Error(`Sản phẩm ${normalizedId} không tồn tại`);
+    }
+
+    return normalizedId;
+};
 
 const inventoryModel = {
     // Lấy tất cả tồn kho
@@ -30,71 +54,91 @@ const inventoryModel = {
 
     // Cập nhật tồn kho
     updateInventory: async (productId, inventoryData) => {
-        const { soLuongTon, soLuongNhap, soLuongXuat, ngayCapNhat } = inventoryData;
+        const targetProductId = await ensureProductExists(productId);
+        const { donVi, soLuong } = inventoryData;
+        const quantityColumn = await resolveQuantityColumn('TonKho');
+
+        const existing = await db.query('SELECT idTK FROM TonKho WHERE idSP = $1', [targetProductId]);
+        if (existing.rows.length > 0) {
+            const sql = `
+                UPDATE TonKho SET
+                    donVi = $1,
+                    ${quantityColumn} = $2
+                WHERE idSP = $3
+                RETURNING *
+            `;
+            const { rows } = await db.query(sql, [donVi || 'cái', soLuong || 0, targetProductId]);
+            return rows[0];
+        }
 
         const sql = `
-            INSERT INTO TonKho (idSP, soLuongTon, soLuongNhap, soLuongXuat, ngayCapNhat)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (idSP)
-            DO UPDATE SET
-                soLuongTon = EXCLUDED.soLuongTon,
-                soLuongNhap = TonKho.soLuongNhap + EXCLUDED.soLuongNhap,
-                soLuongXuat = TonKho.soLuongXuat + EXCLUDED.soLuongXuat,
-                ngayCapNhat = EXCLUDED.ngayCapNhat
+            INSERT INTO TonKho (idTK, idSP, donVi, ${quantityColumn})
+            VALUES ($1, $2, $3, $4)
             RETURNING *
         `;
         const { rows } = await db.query(sql, [
-            productId, soLuongTon, soLuongNhap || 0, soLuongXuat || 0, ngayCapNhat || new Date()
+            generateIdTK(), targetProductId, donVi || 'cái', soLuong || 0
         ]);
         return rows[0];
     },
 
     // Nhập hàng vào kho
     addStock: async (productId, quantity, supplierId = null) => {
-        // Cập nhật tồn kho
-        const inventoryResult = await db.query(`
-            INSERT INTO TonKho (idSP, soLuongTon, soLuongNhap, ngayCapNhat)
-            VALUES ($1, $2, $2, CURRENT_TIMESTAMP)
-            ON CONFLICT (idSP)
-            DO UPDATE SET
-                soLuongTon = TonKho.soLuongTon + EXCLUDED.soLuongTon,
-                soLuongNhap = TonKho.soLuongNhap + EXCLUDED.soLuongTon,
-                ngayCapNhat = CURRENT_TIMESTAMP
-            RETURNING *
-        `, [productId, quantity]);
+        const targetProductId = await ensureProductExists(productId);
+        const quantityColumn = await resolveQuantityColumn('TonKho');
+        const existing = await db.query(`SELECT idTK, ${quantityColumn} FROM TonKho WHERE idSP = $1`, [targetProductId]);
+        let inventoryResult;
 
-        // Ghi lại lịch sử nhập hàng
+        if (existing.rows.length > 0) {
+            const sql = `
+                UPDATE TonKho SET
+                    ${quantityColumn} = ${quantityColumn} + $1
+                WHERE idSP = $2
+                RETURNING *
+            `;
+            const { rows } = await db.query(sql, [quantity, targetProductId]);
+            inventoryResult = rows[0];
+        } else {
+            const sql = `
+                INSERT INTO TonKho (idTK, idSP, donVi, ${quantityColumn})
+                VALUES ($1, $2, $3, $4)
+                RETURNING *
+            `;
+            const { rows } = await db.query(sql, [
+                generateIdTK(), targetProductId, 'cái', quantity
+            ]);
+            inventoryResult = rows[0];
+        }
+
         if (supplierId) {
             await db.query(`
                 INSERT INTO LichSuNhapXuat (idSP, loaiGiaoDich, soLuong, idNCC, ngayGiaoDich)
                 VALUES ($1, 'import', $2, $3, CURRENT_TIMESTAMP)
-            `, [productId, quantity, supplierId]);
+            `, [targetProductId, quantity, supplierId]);
         }
 
-        return inventoryResult.rows[0];
+        return inventoryResult;
     },
 
     // Xuất hàng khỏi kho
     removeStock: async (productId, quantity, reason = 'sale') => {
-        // Kiểm tra tồn kho đủ
-        const checkSql = 'SELECT soLuongTon FROM TonKho WHERE idSP = $1';
+        const quantityColumn = await resolveQuantityColumn('TonKho');
+        const checkSql = `SELECT ${quantityColumn} FROM TonKho WHERE idSP = $1`;
         const checkResult = await db.query(checkSql, [productId]);
 
-        if (checkResult.rows.length === 0 || checkResult.rows[0].soLuongTon < quantity) {
+        const available = Number(checkResult.rows[0]?.[quantityColumn.replace(/"/g, '')] ?? checkResult.rows[0]?.soluong ?? checkResult.rows[0]?.SoLuong ?? 0);
+
+        if (checkResult.rows.length === 0 || available < quantity) {
             throw new Error('Insufficient stock');
         }
 
-        // Cập nhật tồn kho
         const inventoryResult = await db.query(`
             UPDATE TonKho SET
-                soLuongTon = soLuongTon - $2,
-                soLuongXuat = soLuongXuat + $2,
-                ngayCapNhat = CURRENT_TIMESTAMP
+                ${quantityColumn} = ${quantityColumn} - $2
             WHERE idSP = $1
             RETURNING *
         `, [productId, quantity]);
 
-        // Ghi lại lịch sử xuất hàng
         await db.query(`
             INSERT INTO LichSuNhapXuat (idSP, loaiGiaoDich, soLuong, moTa, ngayGiaoDich)
             VALUES ($1, 'export', $2, $3, CURRENT_TIMESTAMP)
@@ -105,14 +149,15 @@ const inventoryModel = {
 
     // Lấy sản phẩm sắp hết hàng
     getLowStockProducts: async (threshold = 10) => {
+        const quantityColumn = await resolveQuantityColumn('TonKho');
         const sql = `
             SELECT tk.*, sp.tenSP as product_name, sp.gianiemyet as unit_price,
                    lsp.nameCate as category_name
             FROM TonKho tk
             LEFT JOIN SanPham sp ON tk.idSP = sp.idSP
             LEFT JOIN LoaiSanPham lsp ON sp.IdCate = lsp.IdCate
-            WHERE tk.soLuongTon <= $1 AND tk.soLuongTon > 0
-            ORDER BY tk.soLuongTon ASC
+            WHERE tk.${quantityColumn} <= $1 AND tk.${quantityColumn} > 0
+            ORDER BY tk.${quantityColumn} ASC
         `;
         const { rows } = await db.query(sql, [threshold]);
         return rows;
@@ -120,13 +165,14 @@ const inventoryModel = {
 
     // Lấy sản phẩm hết hàng
     getOutOfStockProducts: async () => {
+        const quantityColumn = await resolveQuantityColumn('TonKho');
         const sql = `
             SELECT sp.*, lsp.nameCate as category_name, nsx.TenNSX as manufacturer_name
             FROM SanPham sp
             LEFT JOIN LoaiSanPham lsp ON sp.IdCate = lsp.IdCate
             LEFT JOIN NhaSanXuat nsx ON sp.IdNSX = nsx.IdNSX
             LEFT JOIN TonKho tk ON sp.idSP = tk.idSP
-            WHERE tk.idSP IS NULL OR tk.soLuongTon = 0
+            WHERE tk.idSP IS NULL OR tk.${quantityColumn} = 0
             ORDER BY sp.tenSP
         `;
         const { rows } = await db.query(sql);
@@ -166,14 +212,13 @@ const inventoryModel = {
 
     // Thống kê tồn kho
     getInventoryStats: async () => {
+        const quantityColumn = await resolveQuantityColumn('TonKho');
         const sql = `
             SELECT
                 COUNT(DISTINCT tk.idSP) as total_products_in_stock,
-                SUM(tk.soLuongTon) as total_stock_quantity,
-                SUM(tk.soLuongTon * sp.gianiemyet) as total_stock_value,
-                AVG(tk.soLuongTon) as avg_stock_per_product,
-                SUM(tk.soLuongNhap) as total_imported,
-                SUM(tk.soLuongXuat) as total_exported
+                SUM(tk.${quantityColumn}) as total_stock_quantity,
+                SUM(tk.${quantityColumn} * sp.gianiemyet) as total_stock_value,
+                AVG(tk.${quantityColumn}) as avg_stock_per_product
             FROM TonKho tk
             LEFT JOIN SanPham sp ON tk.idSP = sp.idSP
         `;
@@ -183,12 +228,13 @@ const inventoryModel = {
 
     // Báo cáo tồn kho theo danh mục
     getInventoryByCategory: async () => {
+        const quantityColumn = await resolveQuantityColumn('TonKho');
         const sql = `
             SELECT
                 lsp.nameCate as category_name,
                 COUNT(sp.idSP) as product_count,
-                SUM(tk.soLuongTon) as total_stock,
-                SUM(tk.soLuongTon * sp.gianiemyet) as total_value
+                SUM(tk.${quantityColumn}) as total_stock,
+                SUM(tk.${quantityColumn} * sp.gianiemyet) as total_value
             FROM LoaiSanPham lsp
             LEFT JOIN SanPham sp ON lsp.IdCate = sp.IdCate
             LEFT JOIN TonKho tk ON sp.idSP = tk.idSP

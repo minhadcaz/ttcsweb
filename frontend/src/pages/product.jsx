@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ChevronRight, 
   ChevronDown, 
@@ -14,22 +15,71 @@ import {
 } from 'lucide-react';
 
 const ProductDetail = () => {
-  // Mock data cho danh sách ảnh
-  const images = [
-    "https://via.placeholder.com/600x400?text=Laptop+Lenovo+LOQ+1",
-    "https://via.placeholder.com/600x400?text=Goc+Nghieng+2",
-    "https://via.placeholder.com/600x400?text=Mat+Sau+3",
-    "https://via.placeholder.com/600x400?text=Ban+Phim+4",
-    "https://via.placeholder.com/600x400?text=Cac+Cong+Ket+Noi+5"
-  ];
+  const { id } = useParams();
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-  // State quản lý ảnh đang hiển thị và số lượng mua
-  const [activeImage, setActiveImage] = useState(images[0]);
+  const [product, setProduct] = useState(null);
+  const [activeImage, setActiveImage] = useState('');
+  const [images, setImages] = useState([]);
   const [quantity, setQuantity] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch(`${API_BASE_URL}/api/products/${encodeURIComponent(id)}`);
+        if (!res.ok) throw new Error('Failed to fetch product');
+        const data = await res.json();
+        const p = data?.data || data || null;
+        setProduct(p);
+
+        // Try to extract images from common fields
+        const rawImages = p?.hinhAnh || p?.hinhanh || p?.images || p?.image || p?.imagesList || [];
+        const imgs = Array.isArray(rawImages) ? rawImages : (typeof rawImages === 'string' ? [rawImages] : []);
+        if (imgs.length === 0 && p?.anh) imgs.push(p.anh);
+        setImages(imgs.length ? imgs : [ 'https://via.placeholder.com/600x400?text=No+Image' ]);
+        setActiveImage(imgs.length ? imgs[0] : 'https://via.placeholder.com/600x400?text=No+Image');
+      } catch (err) {
+        console.error('Load product failed', err);
+        setError('Không thể tải thông tin sản phẩm');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [id]);
+
+  // Parse technical specs from product.thongsokythuat if present
+  const parseSpecs = (raw) => {
+    if (!raw) return null;
+    try {
+      if (typeof raw === 'string') {
+        const parsed = JSON.parse(raw);
+        return parsed;
+      }
+      return raw;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const specs = parseSpecs(product?.thongsokythuat ?? product?.thongSoKyThuat ?? product?.specs);
 
   // Hàm xử lý tăng giảm số lượng
   const handleIncrease = () => setQuantity(prev => prev + 1);
   const handleDecrease = () => setQuantity(prev => (prev > 1 ? prev - 1 : 1));
+
+  if (loading) {
+    return <div className="p-8 text-center">Đang tải sản phẩm...</div>;
+  }
+
+  if (error) {
+    return <div className="p-8 text-center text-red-600">{error}</div>;
+  }
 
   return (
     <div className="bg-white text-gray-800 font-sans p-4 md:p-8">
@@ -52,7 +102,7 @@ const ProductDetail = () => {
             <div className="border rounded-lg p-4 mb-4 flex justify-center">
               <img 
                 src={activeImage} 
-                alt="Laptop Lenovo LOQ" 
+                alt={product?.tensp || product?.tenSP || product?.name || 'Sản phẩm'} 
                 className="max-w-full h-auto object-contain aspect-video"
               />
             </div>
@@ -94,25 +144,25 @@ const ProductDetail = () => {
           {/* CỘT PHẢI: Thông tin mua hàng */}
           <div>
             <h1 className="text-2xl font-bold mb-3">
-              Lenovo LOQ Essential 15IAX9E | Core i5 12450HX, 16GB, 512GB, RTX 3050 6GB, 15.6" FHD 144Hz, W11, Luna Grey
+              {product?.tensp || product?.tenSP || product?.name || 'Tên sản phẩm'}
             </h1>
-            
+
             <div className="flex flex-wrap items-center text-sm text-gray-500 gap-4 mb-4">
-              <span>Mã SP: <span className="text-blue-500 font-medium">LT0000975</span></span>
-              <span>Đánh giá: 0</span>
-              <span>Bình luận: 0</span>
-              <span>Lượt xem: 6224</span>
-              <span>Đã bán: 21</span>
+              <span>Mã SP: <span className="text-blue-500 font-medium">{product?.maSP || product?.idsp || id}</span></span>
+              <span>Đánh giá: {product?.rating || 0}</span>
+              <span>Bình luận: {product?.commentsCount || 0}</span>
+              <span>Lượt xem: {product?.views || 0}</span>
+              <span>Đã bán: {product?.sold || product?.soLuongDaBan || 0}</span>
             </div>
 
             <div className="flex items-center text-sm gap-4 mb-4">
-              <span>Bảo hành: <span className="text-red-500 font-medium">12 tháng</span></span>
-              <span>Tình trạng: <span className="text-green-500 font-medium">Còn hàng</span></span>
+              <span>Bảo hành: <span className="text-red-500 font-medium">{product?.warranty || product?.baoHanh || '—'}</span></span>
+              <span>Tình trạng: <span className={`${(product?.quantity ?? product?.soLuongTon ?? 0) > 0 ? 'text-green-500' : 'text-red-500'} font-medium`}>{(product?.quantity ?? product?.soLuongTon ?? 0) > 0 ? 'Còn hàng' : 'Hết hàng'}</span></span>
             </div>
 
             {/* Khung Giá */}
             <div className="border-2 border-red-500 bg-red-50 rounded-lg p-4 mb-6">
-              <span className="text-4xl font-bold text-red-600">20.590.000đ</span>
+              <span className="text-4xl font-bold text-red-600">{(product?.gianiemyet || product?.price) ? `${Number(product.gianiemyet || product.price).toLocaleString('vi-VN')}đ` : 'Liên hệ'}</span>
             </div>
 
             {/* Khung Khuyến mãi */}
@@ -144,14 +194,18 @@ const ProductDetail = () => {
                 />
                 <button onClick={handleIncrease} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 transition-colors">+</button>
               </div>
-              <button className="border border-blue-500 text-blue-500 px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-50 transition-colors font-medium">
-                <ShoppingCart className="w-5 h-5" /> Thêm vào giỏ hàng
+              <button onClick={() => {
+                alert('Module đặt hàng đang được thiết kế lại từ đầu. Tính năng thêm vào giỏ tạm thời bị tắt.');
+              }} className="border border-gray-400 text-gray-500 px-4 py-2 rounded flex items-center gap-2 cursor-not-allowed font-medium">
+                <ShoppingCart className="w-5 h-5" /> Tạm ngưng đặt hàng
               </button>
             </div>
 
-            <button className="w-full bg-red-600 text-white font-bold py-3 rounded-lg text-lg mb-3 hover:bg-red-700 transition-colors">
+            <button onClick={() => {
+              alert('Module đặt hàng đang được thiết kế lại từ đầu.');
+            }} className="w-full bg-gray-400 text-white font-bold py-3 rounded-lg text-lg mb-3 cursor-not-allowed transition-colors">
               ĐẶT MUA NGAY
-              <span className="block text-sm font-normal mt-1">Giao hàng tận nơi nhanh chóng</span>
+              <span className="block text-sm font-normal mt-1">Tạm dừng thanh toán</span>
             </button>
 
             <div className="grid grid-cols-2 gap-3 mb-6">
@@ -266,37 +320,45 @@ const ProductDetail = () => {
                     </div>
                     
                     <div className="text-sm">
-                      <div className="grid grid-cols-3 border-b">
-                        <div className="col-span-1 bg-gray-50 p-3 font-medium text-gray-700">Hãng sản xuất</div>
-                        <div className="col-span-2 p-3 text-gray-800">Laptop Lenovo</div>
-                      </div>
-                      <div className="grid grid-cols-3 border-b">
-                        <div className="col-span-1 bg-gray-50 p-3 font-medium text-gray-700">Tên sản phẩm</div>
-                        <div className="col-span-2 p-3 text-gray-800">Laptop Lenovo LOQ 15IAX9E 83LK0079VN</div>
-                      </div>
-                      <div className="bg-gray-50 p-3 font-bold text-gray-800 border-b">
-                        Bộ vi xử lý
-                      </div>
-                      <div className="grid grid-cols-3 border-b">
-                        <div className="col-span-1 bg-gray-50 p-3 font-medium text-gray-700">Công nghệ CPU</div>
-                        <div className="col-span-2 p-3 text-gray-800">Intel Core i5-12450HX</div>
-                      </div>
-                      <div className="grid grid-cols-3 border-b">
-                        <div className="col-span-1 bg-gray-50 p-3 font-medium text-gray-700">Số nhân</div>
-                        <div className="col-span-2 p-3 text-gray-800">8</div>
-                      </div>
-                      <div className="grid grid-cols-3 border-b">
-                        <div className="col-span-1 bg-gray-50 p-3 font-medium text-gray-700">Số luồng</div>
-                        <div className="col-span-2 p-3 text-gray-800">12</div>
-                      </div>
-                      <div className="grid grid-cols-3 border-b">
-                        <div className="col-span-1 bg-gray-50 p-3 font-medium text-gray-700">Tốc độ tối đa</div>
-                        <div className="col-span-2 p-3 text-gray-800">upto 4.4 GHz</div>
-                      </div>
-                      <div className="grid grid-cols-3 border-b">
-                        <div className="col-span-1 bg-gray-50 p-3 font-medium text-gray-700">Bộ nhớ đệm</div>
-                        <div className="col-span-2 p-3 text-gray-800">12MB</div>
-                      </div>
+                      {specs ? (
+                        Array.isArray(specs) ? (
+                          specs.map((section, idx) => (
+                            <div key={idx}>
+                              {section.title ? (
+                                <div className="bg-gray-50 p-3 font-bold text-gray-800 border-b">{section.title}</div>
+                              ) : null}
+                              {section.items && Array.isArray(section.items) ? (
+                                section.items.map((it, i) => (
+                                  <div key={i} className="grid grid-cols-3 border-b">
+                                    <div className="col-span-1 bg-gray-50 p-3 font-medium text-gray-700">{it.label || it.key || Object.keys(it)[0]}</div>
+                                    <div className="col-span-2 p-3 text-gray-800">{it.value ?? it.val ?? Object.values(it)[0]}</div>
+                                  </div>
+                                ))
+                              ) : (
+                                Object.entries(section).map(([k, v]) => (
+                                  k === 'title' ? null : (
+                                    <div key={k} className="grid grid-cols-3 border-b">
+                                      <div className="col-span-1 bg-gray-50 p-3 font-medium text-gray-700">{k}</div>
+                                      <div className="col-span-2 p-3 text-gray-800">{String(v)}</div>
+                                    </div>
+                                  )
+                                ))
+                              )}
+                            </div>
+                          ))
+                        ) : typeof specs === 'object' ? (
+                          Object.entries(specs).map(([k, v]) => (
+                            <div key={k} className="grid grid-cols-3 border-b">
+                              <div className="col-span-1 bg-gray-50 p-3 font-medium text-gray-700">{k}</div>
+                              <div className="col-span-2 p-3 text-gray-800">{Array.isArray(v) ? v.join(', ') : String(v)}</div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-3 text-gray-700">{String(specs)}</div>
+                        )
+                      ) : (
+                        <div className="p-3 text-gray-700">Không có thông số kỹ thuật chi tiết.</div>
+                      )}
                     </div>
 
                     <div className="p-4">

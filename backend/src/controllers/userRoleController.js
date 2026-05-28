@@ -1,3 +1,4 @@
+const bcrypt = require('bcrypt');
 const userRoleModel = require('../models/userRoleModel');
 
 const userRoleController = {
@@ -61,7 +62,12 @@ const userRoleController = {
     updatePassword: async (req, res) => {
         try {
             const { newPassword } = req.body;
-            const updatedUser = await userRoleModel.updatePassword(req.params.id, newPassword);
+            if (!newPassword || String(newPassword).trim().length < 6) {
+                return res.status(400).json({ success: false, message: 'Mật khẩu mới phải có ít nhất 6 ký tự.' });
+            }
+
+            const hashedPassword = await bcrypt.hash(String(newPassword), 10);
+            const updatedUser = await userRoleModel.updatePassword(req.params.id, hashedPassword);
 
             if (!updatedUser) {
                 return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
@@ -198,16 +204,21 @@ const userRoleController = {
             const { email, password } = req.body;
             const user = await userRoleModel.findUserByEmail(email);
 
-            if (!user || user.matkhau !== password) {
+            if (!user) {
                 return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng' });
             }
 
-            if (user.trangthai !== 'active') {
+            const isMatch = await bcrypt.compare(String(password || ''), user.pass || '');
+            if (!isMatch) {
+                return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng' });
+            }
+
+            if (user.tinhtrang !== 'Hoat dong') {
                 return res.status(401).json({ success: false, message: 'Tài khoản đã bị khóa' });
             }
 
             // Không trả mật khẩu trong response
-            const { matkhau, ...userWithoutPassword } = user;
+            const { pass, ...userWithoutPassword } = user;
 
             res.status(200).json({
                 success: true,
